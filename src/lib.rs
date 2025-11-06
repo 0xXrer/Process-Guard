@@ -6,6 +6,8 @@ pub mod txf;
 pub mod cli;
 pub mod etw_protection;
 pub mod kernel_driver;
+pub mod syscall_monitor;
+pub mod heavens_gate;
 
 use std::sync::Arc;
 use dashmap::DashMap;
@@ -47,6 +49,8 @@ pub enum InjectionType {
     AtomBombing,
     ShimInjection,
     ProcessDoppelganging,
+    DirectSyscalls,
+    HeavensGate,
 }
 
 pub struct ProcessGuard {
@@ -56,6 +60,8 @@ pub struct ProcessGuard {
     ml_engine: Arc<ml::AnomalyEngine>,
     txf_monitor: Arc<txf::TxfMonitor>,
     etw_protection: Arc<etw_protection::EtwProtection>,
+    syscall_monitor: Arc<syscall_monitor::SyscallMonitor>,
+    heavens_gate_detector: Arc<heavens_gate::HeavensGateDetector>,
 }
 
 impl ProcessGuard {
@@ -65,6 +71,8 @@ impl ProcessGuard {
         let ml_engine = ml::AnomalyEngine::new();
         let txf_monitor = txf::TxfMonitor::new();
         let etw_protection = etw_protection::EtwProtection::new()?;
+        let syscall_monitor = syscall_monitor::SyscallMonitor::new()?;
+        let heavens_gate_detector = heavens_gate::HeavensGateDetector::new()?;
 
         unsafe {
             txf::set_global_monitor(&txf_monitor);
@@ -78,6 +86,8 @@ impl ProcessGuard {
             ml_engine: Arc::new(ml_engine),
             txf_monitor: Arc::new(txf_monitor),
             etw_protection: Arc::new(etw_protection),
+            syscall_monitor: Arc::new(syscall_monitor),
+            heavens_gate_detector: Arc::new(heavens_gate_detector),
         })
     }
 
@@ -90,8 +100,15 @@ impl ProcessGuard {
         // Start ETW protection first
         self.etw_protection.start_monitoring().await?;
 
+        // Start new detection modules
+        self.syscall_monitor.start_monitoring().await?;
+        self.heavens_gate_detector.start_monitoring().await?;
+
+        let syscall_monitor = self.syscall_monitor.clone();
+        let heavens_gate_detector = self.heavens_gate_detector.clone();
+
         tokio::spawn(async move {
-            detector.run(processes, ml_engine, txf_monitor).await
+            detector.run(processes, ml_engine, txf_monitor, syscall_monitor, heavens_gate_detector).await
         });
 
         self.etw_session.write().start().await?;

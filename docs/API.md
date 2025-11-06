@@ -101,7 +101,7 @@ Scan specific process for injections.
 **Request Body:** (optional)
 ```json
 {
-  "techniques": ["ProcessHollowing", "ThreadHijacking", "ProcessDoppelganging"],
+  "techniques": ["ProcessHollowing", "ThreadHijacking", "ProcessDoppelganging", "DirectSyscalls", "HeavensGate"],
   "deep_scan": true
 }
 ```
@@ -198,17 +198,27 @@ Get system statistics.
   "techniques": {
     "ProcessDoppelgänging": {
       "count": 8,
-      "percentage": 53.3,
+      "percentage": 40.0,
       "avg_confidence": 0.91
     },
     "ProcessHollowing": {
       "count": 5,
-      "percentage": 33.3,
+      "percentage": 25.0,
+      "avg_confidence": 0.94
+    },
+    "DirectSyscalls": {
+      "count": 4,
+      "percentage": 20.0,
+      "avg_confidence": 0.89
+    },
+    "HeavensGate": {
+      "count": 2,
+      "percentage": 10.0,
       "avg_confidence": 0.94
     },
     "ThreadHijacking": {
-      "count": 2,
-      "percentage": 13.3,
+      "count": 1,
+      "percentage": 5.0,
       "avg_confidence": 0.87
     }
   },
@@ -266,9 +276,82 @@ Get current configuration.
   "detection": {
     "confidence_threshold": 0.8,
     "ml_threshold": 0.9,
-    "techniques": ["ProcessHollowing", "ProcessDoppelganging"],
-    "false_positive_reduction": true
+    "techniques": ["ProcessHollowing", "ProcessDoppelganging", "DirectSyscalls", "HeavensGate"],
+    "false_positive_reduction": true,
+    "syscall_monitoring": true,
+    "heavens_gate_detection": true
   }
+}
+```
+
+### GET /syscalls
+
+Get syscall monitoring information.
+
+**Query Parameters:**
+- `pid` (int) - Filter by process ID
+- `direct_only` (bool) - Only direct syscalls
+- `limit` (int) - Max results
+
+**Response:**
+```json
+{
+  "syscalls": [
+    {
+      "pid": 1234,
+      "syscall_number": 24,
+      "return_address": "0x401000",
+      "is_direct": true,
+      "stack_frames": [
+        {
+          "return_address": "0x401000",
+          "module_name": "malware.exe",
+          "module_base": "0x400000"
+        }
+      ],
+      "timestamp": 1699123456
+    }
+  ],
+  "total": 150,
+  "direct_syscalls": 15
+}
+```
+
+### GET /wow64
+
+Get WoW64 processes and Heaven's Gate detections.
+
+**Query Parameters:**
+- `transitions_only` (bool) - Only processes with transitions
+- `limit` (int) - Max results
+
+**Response:**
+```json
+{
+  "wow64_processes": [
+    {
+      "pid": 1234,
+      "name": "malware32.exe",
+      "is_wow64": true,
+      "x64_regions": [
+        {
+          "base": "0x7FF800000000",
+          "size": 4096
+        }
+      ],
+      "transitions": [
+        {
+          "from_cs": "0x23",
+          "to_cs": "0x33",
+          "from_address": "0x401000",
+          "to_address": "0x7FF800001000",
+          "timestamp": 1699123456
+        }
+      ]
+    }
+  ],
+  "total": 25,
+  "with_transitions": 3
 }
 ```
 

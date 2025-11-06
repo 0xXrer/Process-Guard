@@ -6,7 +6,7 @@ use windows::Win32::System::Threading::*;
 use windows::Win32::System::Memory::*;
 use windows::Win32::Foundation::*;
 use winapi::um::winnt::{PROCESS_ALL_ACCESS, MEM_COMMIT, PAGE_EXECUTE_READWRITE};
-use crate::{ProcessInfo, InjectionType, Result, GuardError};
+use crate::{ProcessInfo, InjectionType, Result, GuardError, syscall_monitor, heavens_gate};
 
 pub struct InjectionDetector {
     detection_cache: DashMap<u32, Vec<Detection>>,
@@ -32,12 +32,14 @@ impl InjectionDetector {
         processes: Arc<DashMap<u32, ProcessInfo>>,
         ml_engine: Arc<crate::ml::AnomalyEngine>,
         txf_monitor: Arc<crate::txf::TxfMonitor>,
+        syscall_monitor: Arc<crate::syscall_monitor::SyscallMonitor>,
+        heavens_gate_detector: Arc<crate::heavens_gate::HeavensGateDetector>,
     ) {
         loop {
             for entry in processes.iter() {
                 let (pid, info) = entry.pair();
                 
-                if let Some(injection) = self.detect_injection(*pid, info, &txf_monitor).await {
+                if let Some(injection) = self.detect_injection(*pid, info, &txf_monitor, &syscall_monitor, &heavens_gate_detector).await {
                     self.detection_cache.entry(*pid)
                         .or_insert_with(Vec::new)
                         .push(injection.clone());
@@ -69,7 +71,14 @@ impl InjectionDetector {
         }
     }
 
-    async fn detect_injection(&self, pid: u32, info: &ProcessInfo, txf_monitor: &crate::txf::TxfMonitor) -> Option<Detection> {
+    async fn detect_injection(
+        &self,
+        pid: u32,
+        info: &ProcessInfo,
+        txf_monitor: &crate::txf::TxfMonitor,
+        syscall_monitor: &crate::syscall_monitor::SyscallMonitor,
+        heavens_gate_detector: &crate::heavens_gate::HeavensGateDetector,
+    ) -> Option<Detection> {
         if self.detect_hollowing(pid).await {
             return Some(Detection {
                 injection_type: InjectionType::ProcessHollowing,
@@ -107,6 +116,36 @@ impl InjectionDetector {
                             .unwrap()
                             .as_secs(),
                         details: format!("Process Doppelgänging detected: {} via TxF", info.name),
+                    });
+                }
+            }
+        }
+
+        if let Ok(has_inline_syscalls) = syscall_monitor.check_inline_syscalls(pid, info.image_base, 4096).await {
+            if has_inline_syscalls {
+                return Some(Detection {
+                    injection_type: InjectionType::DirectSyscalls,
+                    confidence: 0.89,
+                    timestamp: std::time::SystemTime::now()
+                        .duration_since(std::time::UNIX_EPOCH)
+                        .unwrap()
+                        .as_secs(),
+                    details: format!("Direct syscalls detected in {}", info.name),
+                });
+            }
+        }
+
+        if heavens_gate_detector.is_wow64_process(pid).await {
+            if let Ok(transitions) = heavens_gate_detector.scan_process_for_transitions(pid).await {
+                if !transitions.is_empty() {
+                    return Some(Detection {
+                        injection_type: InjectionType::HeavensGate,
+                        confidence: 0.94,
+                        timestamp: std::time::SystemTime::now()
+                            .duration_since(std::time::UNIX_EPOCH)
+                            .unwrap()
+                            .as_secs(),
+                        details: format!("Heaven's Gate WoW64 transition detected in {}", info.name),
                     });
                 }
             }
