@@ -19,3 +19,4 @@ release/
 .env
 models/
 logs/
+CLAUDE.md

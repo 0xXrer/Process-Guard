@@ -2,6 +2,10 @@ pub mod detector;
 pub mod etw;
 pub mod ml;
 pub mod api;
+pub mod txf;
+pub mod cli;
+pub mod etw_protection;
+pub mod kernel_driver;
 
 use std::sync::Arc;
 use dashmap::DashMap;
@@ -42,6 +46,7 @@ pub enum InjectionType {
     ManualMapping,
     AtomBombing,
     ShimInjection,
+    ProcessDoppelganging,
 }
 
 pub struct ProcessGuard {
@@ -49,6 +54,8 @@ pub struct ProcessGuard {
     detector: Arc<detector::InjectionDetector>,
     etw_session: Arc<RwLock<etw::EtwSession>>,
     ml_engine: Arc<ml::AnomalyEngine>,
+    txf_monitor: Arc<txf::TxfMonitor>,
+    etw_protection: Arc<etw_protection::EtwProtection>,
 }
 
 impl ProcessGuard {
@@ -56,12 +63,21 @@ impl ProcessGuard {
         let etw_session = etw::EtwSession::new()?;
         let detector = detector::InjectionDetector::new();
         let ml_engine = ml::AnomalyEngine::new();
-        
+        let txf_monitor = txf::TxfMonitor::new();
+        let etw_protection = etw_protection::EtwProtection::new()?;
+
+        unsafe {
+            txf::set_global_monitor(&txf_monitor);
+            txf_monitor.install_hooks()?;
+        }
+
         Ok(Self {
             processes: Arc::new(DashMap::new()),
             detector: Arc::new(detector),
             etw_session: Arc::new(RwLock::new(etw_session)),
             ml_engine: Arc::new(ml_engine),
+            txf_monitor: Arc::new(txf_monitor),
+            etw_protection: Arc::new(etw_protection),
         })
     }
 
@@ -69,11 +85,15 @@ impl ProcessGuard {
         let detector = self.detector.clone();
         let processes = self.processes.clone();
         let ml_engine = self.ml_engine.clone();
-        
+        let txf_monitor = self.txf_monitor.clone();
+
+        // Start ETW protection first
+        self.etw_protection.start_monitoring().await?;
+
         tokio::spawn(async move {
-            detector.run(processes, ml_engine).await
+            detector.run(processes, ml_engine, txf_monitor).await
         });
-        
+
         self.etw_session.write().start().await?;
         Ok(())
     }

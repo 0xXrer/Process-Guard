@@ -31,16 +31,17 @@ impl InjectionDetector {
         &self,
         processes: Arc<DashMap<u32, ProcessInfo>>,
         ml_engine: Arc<crate::ml::AnomalyEngine>,
+        txf_monitor: Arc<crate::txf::TxfMonitor>,
     ) {
         loop {
             for entry in processes.iter() {
                 let (pid, info) = entry.pair();
                 
-                if let Some(injection) = self.detect_injection(*pid, info).await {
+                if let Some(injection) = self.detect_injection(*pid, info, &txf_monitor).await {
                     self.detection_cache.entry(*pid)
                         .or_insert_with(Vec::new)
                         .push(injection.clone());
-                    
+
                     if injection.confidence > 0.8 {
                         self.block_process(*pid).await;
                     }
@@ -62,12 +63,13 @@ impl InjectionDetector {
                     }
                 }
             }
-            
+
+            txf_monitor.cleanup_old_transactions();
             tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
         }
     }
 
-    async fn detect_injection(&self, pid: u32, info: &ProcessInfo) -> Option<Detection> {
+    async fn detect_injection(&self, pid: u32, info: &ProcessInfo, txf_monitor: &crate::txf::TxfMonitor) -> Option<Detection> {
         if self.detect_hollowing(pid).await {
             return Some(Detection {
                 injection_type: InjectionType::ProcessHollowing,
@@ -91,7 +93,25 @@ impl InjectionDetector {
                 details: format!("Thread hijacked in {}", info.name),
             });
         }
-        
+
+        for suspicious_tx in txf_monitor.get_suspicious_transactions() {
+            let (_, tx_info) = suspicious_tx;
+            for file_op in &tx_info.files {
+                if file_op.path.contains(&info.name) ||
+                   file_op.pe_written && file_op.section_created {
+                    return Some(Detection {
+                        injection_type: InjectionType::ProcessDoppelganging,
+                        confidence: 0.92,
+                        timestamp: std::time::SystemTime::now()
+                            .duration_since(std::time::UNIX_EPOCH)
+                            .unwrap()
+                            .as_secs(),
+                        details: format!("Process Doppelgänging detected: {} via TxF", info.name),
+                    });
+                }
+            }
+        }
+
         None
     }
 
