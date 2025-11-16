@@ -1,0 +1,131 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+
+env:
+  CARGO_TERM_COLOR: always
+
+permissions:
+  contents: write
+
+jobs:
+  create-release:
+    name: Create Release
+    runs-on: ubuntu-latest
+    outputs:
+      upload_url: ${{ steps.create_release.outputs.upload_url }}
+      version: ${{ steps.get_version.outputs.version }}
+    steps:
+      - name: Get version from tag
+        id: get_version
+        run: echo "version=${GITHUB_REF#refs/tags/v}" >> $GITHUB_OUTPUT
+
+      - name: Create Release
+        id: create_release
+        uses: actions/create-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: ${{ github.ref }}
+          release_name: Release ${{ github.ref_name }}
+          body: |
+            # Process Guard ${{ github.ref_name }}
+
+            ## 🔒 Security Improvements
+            - Fixed all critical API security vulnerabilities
+            - Added authentication middleware with Bearer token support
+            - Implemented rate limiting (10 req/sec default)
+            - Added CORS protection
+            - Implemented request size limits (1MB max)
+            - Added input validation on all endpoints
+            - Protected system processes from termination
+            - Comprehensive SAFETY documentation for unsafe code
+            - Audit logging for all sensitive operations
+            - Constant-time token comparison to prevent timing attacks
+
+            ## 📦 Downloads
+            Download the appropriate binary for your platform below.
+
+            ## 🔐 Security
+            Please verify the checksums of downloaded files.
+
+            ## 📚 Documentation
+            - [Installation Guide](https://github.com/${{ github.repository }}/blob/main/docs/installation.md)
+            - [Quick Start](https://github.com/${{ github.repository }}/blob/main/docs/quickstart.md)
+            - [Security Policy](https://github.com/${{ github.repository }}/blob/main/SECURITY.md)
+
+            ## ⚠️ Breaking Changes
+            - API now requires authentication token (set `PROCESS_GUARD_AUTH_TOKEN` env var)
+            - Process termination now validates PIDs and blocks system processes
+          draft: false
+          prerelease: false
+
+  build-windows:
+    name: Build Windows Binary
+    needs: create-release
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: stable
+
+      - name: Build release
+        run: cargo build --release --all-features
+
+      - name: Create checksum
+        run: |
+          $hash = (Get-FileHash target\release\process-guard.exe -Algorithm SHA256).Hash
+          echo "$hash  process-guard.exe" > process-guard-windows-x64.sha256
+
+      - name: Package binary
+        run: |
+          mkdir release
+          Copy-Item target\release\process-guard.exe release\
+          Copy-Item README.md release\
+          Copy-Item LICENSE release\
+          Copy-Item SECURITY.md release\
+          Compress-Archive -Path release\* -DestinationPath process-guard-${{ needs.create-release.outputs.version }}-windows-x64.zip
+
+      - name: Upload Windows Binary
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ needs.create-release.outputs.upload_url }}
+          asset_path: ./process-guard-${{ needs.create-release.outputs.version }}-windows-x64.zip
+          asset_name: process-guard-${{ needs.create-release.outputs.version }}-windows-x64.zip
+          asset_content_type: application/zip
+
+      - name: Upload Checksum
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ needs.create-release.outputs.upload_url }}
+          asset_path: ./process-guard-windows-x64.sha256
+          asset_name: process-guard-${{ needs.create-release.outputs.version }}-windows-x64.sha256
+          asset_content_type: text/plain
+
+  publish-crate:
+    name: Publish to crates.io
+    needs: [create-release, build-windows]
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/')
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Publish to crates.io
+        env:
+          CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
+        run: cargo publish --allow-dirty || true
+        # Allow dirty because of potential CI modifications
+        # Use || true to not fail if already published
