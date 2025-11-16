@@ -1,0 +1,107 @@
+# Process Guard Configuration Example
+# Copy this file to config.toml and customize for your environment
+
+[server]
+# API server binding address
+host = "127.0.0.1"
+port = 8080
+
+# Enable TLS/HTTPS (recommended for production)
+enable_tls = false
+tls_cert_path = "/path/to/cert.pem"
+tls_key_path = "/path/to/key.pem"
+
+[security]
+# API Authentication
+# Generate secure API keys with: openssl rand -hex 32
+# Store the SHA256 hash of the key in this config
+api_keys = [
+    "your-api-key-sha256-hash-here",
+]
+
+# JWT Secret for token-based authentication
+# Generate with: openssl rand -base64 32
+jwt_secret = "your-jwt-secret-here"
+
+# Rate limiting (requests per minute per IP)
+rate_limit_per_minute = 100
+rate_limit_burst = 10
+
+# Maximum request body size in bytes (default: 1MB)
+max_request_size = 1048576
+
+# CORS allowed origins (comma-separated)
+# Use "*" for development only, specify exact origins in production
+cors_allowed_origins = ["http://localhost:3000", "https://yourdomain.com"]
+
+[monitoring]
+# Process monitoring interval in milliseconds
+interval_ms = 100
+
+# Enable specific detection techniques
+enable_direct_syscalls = true
+enable_heavens_gate = true
+enable_process_hollowing = true
+enable_doppelganging = true
+enable_thread_hijacking = true
+enable_etw_patching = true
+enable_module_stomping = true
+
+[detection]
+# Minimum confidence threshold for alerts (0.0 - 1.0)
+confidence_threshold = 0.7
+
+# Process whitelist (PIDs that should never be flagged)
+# System processes are automatically protected
+whitelist_pids = []
+
+# Process whitelist by name (case-insensitive)
+whitelist_names = [
+    "explorer.exe",
+    "svchost.exe",
+]
+
+[logging]
+# Log level: trace, debug, info, warn, error
+level = "info"
+
+# Log file path (empty for stdout only)
+file_path = ""
+
+# Enable audit logging for API actions
+enable_audit_log = true
+audit_log_path = "audit.log"
+
+# Log format: json, pretty, compact
+format = "json"
+
+[ml]
+# Machine learning anomaly detection
+enable_ml = true
+
+# Model path (trained model file)
+model_path = "models/detector.safetensors"
+
+# ML confidence threshold
+ml_threshold = 0.8
+
+[alerting]
+# Enable real-time alerting
+enable_alerts = true
+
+# Webhook URL for alerts (optional)
+webhook_url = ""
+
+# Alert severity levels to send: low, medium, high, critical
+alert_levels = ["high", "critical"]
+
+[performance]
+# Maximum number of processes to monitor simultaneously
+max_monitored_processes = 1000
+
+# Memory cache size for detections (MB)
+cache_size_mb = 50
+
+# Enable performance metrics collection
+enable_metrics = true
+metrics_port = 9090

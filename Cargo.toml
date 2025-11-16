@@ -1,6 +1,6 @@
 [package]
 name = "process-guard"
-version = "0.1.0"
+version = "0.4.0"
 edition = "2021"
 authors = ["xrer"]
 license = "MIT"
@@ -22,6 +22,7 @@ windows = { version = "0.58", features = [
 ]}
 tokio = { version = "1.41", features = ["full"] }
 axum = "0.7"
+axum-server = { version = "0.7", features = ["tls-rustls"] }
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 tracing = "0.1"
@@ -42,6 +43,16 @@ dirs = "5.0"
 serde_yaml = "0.9"
 reqwest = { version = "0.11", features = ["json"] }
 sha2 = "0.10"
+# Security dependencies
+tower = "0.4"
+tower-http = { version = "0.5", features = ["cors", "limit", "trace"] }
+tower_governor = "0.4"
+jsonwebtoken = "9.3"
+bcrypt = "0.15"
+uuid = { version = "1.11", features = ["v4", "serde"] }
+chrono = { version = "0.4", features = ["serde"] }
+secrecy = "0.8"
+argon2 = "0.5"
 
 [dev-dependencies]
 criterion = "0.5"
@@ -53,10 +64,11 @@ codegen-units = 1
 opt-level = 3
 strip = true
 
-[[bench]]
-name = "detection_bench"
-harness = false
-
-[[bench]]
-name = "txf_bench"
-harness = false
+# Benchmarks (uncomment when benchmark files are created)
+# [[bench]]
+# name = "detection_bench"
+# harness = false
+#
+# [[bench]]
+# name = "txf_bench"
+# harness = false
