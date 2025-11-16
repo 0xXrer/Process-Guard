@@ -10,7 +10,8 @@ We provide security updates for the following versions:
 
 | Version | Supported          | End of Support |
 | ------- | ------------------ | -------------- |
-| 0.3.x   | ✅ Yes (Current)   | N/A            |
+| 0.4.x   | ✅ Yes (Current)   | N/A            |
+| 0.3.x   | ✅ Yes             | 2026-06-30     |
 | 0.2.x   | ⚠️ Limited         | 2025-12-31     |
 | 0.1.x   | ❌ No              | 2025-06-30     |
 | < 0.1   | ❌ No              | Ended          |
@@ -312,9 +313,30 @@ Process Guard includes the following security features:
 
 | Date | Type | Findings | Status |
 |------|------|----------|--------|
+| 2025-11-16 | Security Audit | 10 security issues found (3 Critical, 3 High, 4 Medium) | ✅ All Fixed in v0.4.0 |
 | 2025-11-16 | Internal Review | Documentation gaps identified | ✅ Fixed |
 | 2025-11-06 | Code Audit | No critical issues | ✅ Passed |
 | Future | External Audit | Planned | 📅 Scheduled |
+
+### v0.4.0 Security Fixes (2025-11-16)
+
+All 10 security issues identified in the November 2025 audit have been resolved:
+
+#### ✅ Critical Issues Fixed
+1. **API Authentication Missing** - Implemented JWT and API key authentication with SHA-256 hashing
+2. **Process Termination Without Authorization** - Added PID validation, protected process list, and audit logging
+3. **Unsafe Code Documentation** - Added comprehensive SAFETY comments and proper error handling
+
+#### ✅ High Issues Fixed
+4. **No Rate Limiting** - Implemented tower-governor rate limiting (100 req/min, burst of 10)
+5. **No TLS/HTTPS Support** - Added TLS/HTTPS support with axum-server
+6. **Unsafe Code Error Handling** - All unsafe blocks now properly handle and check return values
+
+#### ✅ Medium Issues Fixed
+7. **No Input Validation** - Comprehensive validation for all API inputs (PIDs, actions, etc.)
+8. **Information Disclosure** - Fixed uptime calculation to use actual start time
+9. **No CORS Protection** - Implemented CORS middleware with configurable origins
+10. **No Request Size Limits** - Added 1MB request body size limit
 
 ## 🎖️ Security Hall of Fame
 
