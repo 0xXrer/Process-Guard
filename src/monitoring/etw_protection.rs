@@ -14,7 +14,7 @@ use winapi::um::winnt::*;
 use winapi::um::memoryapi::*;
 use ntapi::ntmmapi::*;
 use ntapi::ntpsapi::*;
-use crate::{Result, GuardError};
+use crate::utils::{Result, GuardError};
 
 #[derive(Debug, Clone)]
 pub struct IntegrityCheckpoint {
@@ -509,7 +509,7 @@ impl EtwProtection {
     }
 
     async fn setup_kernel_communication(&self) -> Result<KernelFallback> {
-        use crate::kernel_driver::KernelDriver;
+        use crate::platform::kernel_driver::KernelDriver;
 
         let kernel_driver = KernelDriver::new();
 

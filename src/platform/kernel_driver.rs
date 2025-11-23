@@ -6,7 +6,8 @@ use windows::Win32::System::IO::*;
 use windows::Win32::System::Threading::*;
 use winapi::um::winioctl::*;
 use winapi::shared::ntdef::*;
-use crate::{Result, GuardError, ProcessInfo, InjectionType};
+use crate::utils::{Result, GuardError};
+use crate::core::{ProcessInfo, InjectionType};
 
 #[repr(C)]
 #[derive(Debug, Clone)]

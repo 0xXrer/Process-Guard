@@ -1,4 +1,4 @@
-use crate::{GuardError, Result};
+use crate::utils::{GuardError, Result};
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 use std::mem;

@@ -2,9 +2,11 @@ use std::io::{self, Write};
 use std::process;
 use clap::Parser;
 use process_guard::{ProcessGuard, ProcessInfo, InjectionType, Result};
-use process_guard::cli::{Cli, Commands, ConfigAction, Config, OutputFormat, BenchmarkType};
+use process_guard::interface::{Cli, Commands, ConfigAction, OutputFormat, BenchmarkType};
+use process_guard::core::Config;
 use tracing::{info, error, warn};
 use serde_json;
+
 
 #[tokio::main]
 async fn main() -> Result<()> {
@@ -357,7 +359,7 @@ async fn kill_process(pid: u32, force: bool) -> Result<()> {
     Ok(())
 }
 
-async fn export_rules(_format: process_guard::cli::ExportFormat, output: std::path::PathBuf, _stats: bool) -> Result<()> {
+async fn export_rules(_format: process_guard::interface::ExportFormat, output: std::path::PathBuf, _stats: bool) -> Result<()> {
     let rules = r#"rule ProcessDoppelganging {
     meta:
         description = "Detects Process Doppelgänging via TxF"

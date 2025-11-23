@@ -6,7 +6,10 @@ use windows::Win32::System::Threading::*;
 use windows::Win32::System::Memory::*;
 use windows::Win32::Foundation::*;
 use winapi::um::winnt::{PROCESS_ALL_ACCESS, MEM_COMMIT, PAGE_EXECUTE_READWRITE};
-use crate::{ProcessInfo, InjectionType, Result, GuardError, syscall_monitor, heavens_gate};
+use crate::core::{ProcessInfo, InjectionType};
+use crate::utils::{Result, GuardError};
+use crate::monitoring::syscall;
+use crate::platform::heavens_gate;
 
 pub struct InjectionDetector {
     detection_cache: DashMap<u32, Vec<Detection>>,

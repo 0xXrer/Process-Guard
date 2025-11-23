@@ -12,7 +12,8 @@ use winapi::um::fileapi::*;
 use winapi::shared::ntdef::*;
 use ntapi::ntrtl::*;
 use ntapi::nttxf::*;
-use crate::{InjectionType, Result, GuardError};
+use crate::core::InjectionType;
+use crate::utils::{Result, GuardError};
 
 #[derive(Debug, Clone)]
 pub struct TransactionInfo {

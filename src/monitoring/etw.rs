@@ -4,7 +4,7 @@ use windows::core::*;
 use std::sync::Arc;
 use parking_lot::Mutex;
 use crossbeam_channel::{Sender, Receiver};
-use crate::{Result, GuardError};
+use crate::utils::{Result, GuardError};
 
 pub struct EtwSession {
     session_handle: TRACEHANDLE,
