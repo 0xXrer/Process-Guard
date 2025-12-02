@@ -58,13 +58,19 @@ public:
     NTSTATUS AddWhitelist(HANDLE pid);
     NTSTATUS RemoveWhitelist(HANDLE pid);
     bool IsProcessWhitelisted(HANDLE pid);
+    bool IsProcessWhitelistedByName(const char* processName);
     void ClearWhitelist();
+    void InitializeSystemWhitelist();
 
 private:
     LIST_ENTRY m_listHead;
     LIST_ENTRY m_whitelistHead;
     ERESOURCE m_lock;
     bool m_initialized;
+
+    static constexpr size_t MAX_SYSTEM_NAMES = 16;
+    char m_systemProcessNames[MAX_SYSTEM_NAMES][16];
+    size_t m_systemNameCount;
 
     ProcessEntry* FindEntry(HANDLE pid);
     WhitelistEntry* FindWhitelistEntry(HANDLE pid);

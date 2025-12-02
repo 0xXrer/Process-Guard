@@ -3,9 +3,10 @@
 
 namespace ProcessGuard {
 
-ProcessList::ProcessList() : m_initialized(false) {
+ProcessList::ProcessList() : m_initialized(false), m_systemNameCount(0) {
     InitializeListHead(&m_listHead);
     InitializeListHead(&m_whitelistHead);
+    RtlZeroMemory(m_systemProcessNames, sizeof(m_systemProcessNames));
 }
 
 ProcessList::~ProcessList() {
@@ -202,6 +203,51 @@ WhitelistEntry* ProcessList::FindWhitelistEntry(HANDLE pid) {
         }
     }
     return nullptr;
+}
+
+void ProcessList::InitializeSystemWhitelist() {
+    if (!m_initialized) {
+        return;
+    }
+
+    const char* systemProcesses[] = {
+        "csrss.exe",
+        "lsass.exe",
+        "services.exe",
+        "svchost.exe",
+        "wininit.exe",
+        "winlogon.exe",
+        "smss.exe",
+        "System"
+    };
+
+    AutoLock lock(&m_lock, AutoLock::Mode::Exclusive);
+
+    for (size_t i = 0; i < sizeof(systemProcesses) / sizeof(systemProcesses[0]) && m_systemNameCount < MAX_SYSTEM_NAMES; i++) {
+        size_t len = strlen(systemProcesses[i]);
+        if (len < sizeof(m_systemProcessNames[m_systemNameCount])) {
+            RtlCopyMemory(m_systemProcessNames[m_systemNameCount], systemProcesses[i], len + 1);
+            m_systemNameCount++;
+        }
+    }
+
+    LogInfo("Initialized system whitelist with %zu entries", m_systemNameCount);
+}
+
+bool ProcessList::IsProcessWhitelistedByName(const char* processName) {
+    if (!m_initialized || !processName) {
+        return false;
+    }
+
+    AutoLock lock(&m_lock, AutoLock::Mode::Shared);
+
+    for (size_t i = 0; i < m_systemNameCount; i++) {
+        if (_stricmp(processName, m_systemProcessNames[i]) == 0) {
+            return true;
+        }
+    }
+
+    return false;
 }
 
 }

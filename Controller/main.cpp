@@ -14,6 +14,8 @@ void PrintUsage() {
     std::wcout << L"  pgctl clear                     - Clear all protections\n";
     std::wcout << L"  pgctl selfdefense on            - Enable self-defense\n";
     std::wcout << L"  pgctl selfdefense off           - Disable self-defense\n";
+    std::wcout << L"  pgctl setflags <flags>          - Set protection flags (hex)\n";
+    std::wcout << L"  pgctl getflags                  - Get current protection flags\n";
     std::wcout << L"  pgctl stop                      - Stop driver (requires allowunload)\n";
     std::wcout << L"  pgctl allowunload               - Allow driver unload\n";
     std::wcout << L"  pgctl uninstall                 - Uninstall driver\n";
@@ -198,6 +200,42 @@ int wmain(int argc, wchar_t* argv[]) {
             return 0;
         } else {
             std::wcerr << L"Failed to allow unload: " << control.GetLastErrorMessage() << L"\n";
+            return 1;
+        }
+    }
+    else if (command == L"setflags") {
+        if (argc < 3) {
+            std::wcerr << L"Error: Missing flags value\n";
+            return 1;
+        }
+
+        DWORD flags = static_cast<DWORD>(wcstoul(argv[2], nullptr, 16));
+
+        if (!control.OpenDevice(devicePath)) {
+            std::wcerr << L"Failed to open device: " << control.GetLastErrorMessage() << L"\n";
+            return 1;
+        }
+
+        if (control.SetProtectionFlags(flags)) {
+            std::wcout << L"Protection flags set to 0x" << std::hex << flags << std::dec << L"\n";
+            return 0;
+        } else {
+            std::wcerr << L"Failed to set flags: " << control.GetLastErrorMessage() << L"\n";
+            return 1;
+        }
+    }
+    else if (command == L"getflags") {
+        if (!control.OpenDevice(devicePath)) {
+            std::wcerr << L"Failed to open device: " << control.GetLastErrorMessage() << L"\n";
+            return 1;
+        }
+
+        DWORD flags = 0;
+        if (control.GetProtectionFlags(flags)) {
+            std::wcout << L"Current protection flags: 0x" << std::hex << flags << std::dec << L"\n";
+            return 0;
+        } else {
+            std::wcerr << L"Failed to get flags: " << control.GetLastErrorMessage() << L"\n";
             return 1;
         }
     }

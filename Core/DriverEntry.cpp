@@ -1,14 +1,18 @@
 #include <ntddk.h>
 #include "ProcessList.h"
 #include "Callbacks.h"
+#include "RegistryProtection.h"
+#include "ProcessCreationCallback.h"
 #include "Globals.h"
 #include "../Shared/Common.h"
 
 namespace ProcessGuard {
     ProcessList g_processList;
     CallbackManager* g_callbackManager = nullptr;
+    RegistryProtection* g_registryProtection = nullptr;
+    ProcessCreationCallback* g_processCreationCallback = nullptr;
     PDEVICE_OBJECT g_deviceObject = nullptr;
-    GlobalState g_state = { false, false, nullptr, PG_FLAG_DEFAULT };
+    GlobalState g_state = { false, false, false, nullptr, PG_FLAG_DEFAULT };
 }
 
 using namespace ProcessGuard;
@@ -27,6 +31,8 @@ extern "C" NTSTATUS DriverEntry(PDRIVER_OBJECT driverObject, PUNICODE_STRING reg
         LogError("Failed to initialize ProcessList: 0x%08X", status);
         return status;
     }
+
+    g_processList.InitializeSystemWhitelist();
 
     UNICODE_STRING deviceName = RTL_CONSTANT_STRING(L"\\Device\\ProcessGuard");
     status = IoCreateDevice(
@@ -74,6 +80,30 @@ extern "C" NTSTATUS DriverEntry(PDRIVER_OBJECT driverObject, PUNICODE_STRING reg
         return status;
     }
 
+    g_registryProtection = new (NonPagedPool, PROCESS_GUARD_TAG) RegistryProtection();
+    if (!g_registryProtection) {
+        LogWarning("Failed to allocate RegistryProtection, continuing without registry protection");
+    } else {
+        status = g_registryProtection->RegisterCallback();
+        if (!NT_SUCCESS(status)) {
+            LogWarning("Failed to register registry callback: 0x%08X, continuing without registry protection", status);
+            delete g_registryProtection;
+            g_registryProtection = nullptr;
+        }
+    }
+
+    g_processCreationCallback = new (NonPagedPool, PROCESS_GUARD_TAG) ProcessCreationCallback(&g_processList);
+    if (!g_processCreationCallback) {
+        LogWarning("Failed to allocate ProcessCreationCallback, continuing without process tracking");
+    } else {
+        status = g_processCreationCallback->RegisterCallback();
+        if (!NT_SUCCESS(status)) {
+            LogWarning("Failed to register process creation callback: 0x%08X, continuing without process tracking", status);
+            delete g_processCreationCallback;
+            g_processCreationCallback = nullptr;
+        }
+    }
+
     driverObject->MajorFunction[IRP_MJ_CREATE] = [](PDEVICE_OBJECT, PIRP irp) -> NTSTATUS {
         irp->IoStatus.Status = STATUS_SUCCESS;
         irp->IoStatus.Information = 0;
@@ -104,6 +134,18 @@ void DriverUnload(PDRIVER_OBJECT driverObject) {
     }
 
     LogInfo("ProcessGuard driver unloading...");
+
+    if (g_processCreationCallback) {
+        g_processCreationCallback->UnregisterCallback();
+        delete g_processCreationCallback;
+        g_processCreationCallback = nullptr;
+    }
+
+    if (g_registryProtection) {
+        g_registryProtection->UnregisterCallback();
+        delete g_registryProtection;
+        g_registryProtection = nullptr;
+    }
 
     if (g_callbackManager) {
         g_callbackManager->UnregisterCallbacks();
@@ -260,6 +302,31 @@ NTSTATUS OnDeviceControl(PDEVICE_OBJECT deviceObject, PIRP irp) {
 
             HANDLE pid = *static_cast<HANDLE*>(irp->AssociatedIrp.SystemBuffer);
             status = g_processList.AddWhitelist(pid);
+            break;
+        }
+
+        case IOCTL_PG_SET_FLAGS: {
+            if (stack->Parameters.DeviceIoControl.InputBufferLength < sizeof(unsigned int)) {
+                status = STATUS_INVALID_BUFFER_SIZE;
+                break;
+            }
+
+            unsigned int flags = *static_cast<unsigned int*>(irp->AssociatedIrp.SystemBuffer);
+            g_state.ProtectionFlags = flags;
+            LogInfo("Protection flags updated to 0x%08X", flags);
+            status = STATUS_SUCCESS;
+            break;
+        }
+
+        case IOCTL_PG_GET_FLAGS: {
+            if (stack->Parameters.DeviceIoControl.OutputBufferLength < sizeof(unsigned int)) {
+                status = STATUS_INVALID_BUFFER_SIZE;
+                break;
+            }
+
+            *static_cast<unsigned int*>(irp->AssociatedIrp.SystemBuffer) = g_state.ProtectionFlags;
+            information = sizeof(unsigned int);
+            status = STATUS_SUCCESS;
             break;
         }
 

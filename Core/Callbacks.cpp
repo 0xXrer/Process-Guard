@@ -99,6 +99,12 @@ OB_PREOP_CALLBACK_STATUS CallbackManager::PreOperationCallback(
         return OB_PREOP_SUCCESS;
     }
 
+    PEPROCESS callerProcess = PsGetCurrentProcess();
+    const char* callerName = PsGetProcessImageFileName(callerProcess);
+    if (callerName && manager->m_processList->IsProcessWhitelistedByName(callerName)) {
+        return OB_PREOP_SUCCESS;
+    }
+
     ACCESS_MASK dangerousAccess = 0;
 
     if (g_state.ProtectionFlags & PG_FLAG_PROTECT_TERMINATE) {
@@ -163,6 +169,12 @@ OB_PREOP_CALLBACK_STATUS CallbackManager::ThreadPreOperationCallback(
 
     HANDLE callerPid = PsGetCurrentProcessId();
     if (manager->m_processList->IsProcessWhitelisted(callerPid)) {
+        return OB_PREOP_SUCCESS;
+    }
+
+    PEPROCESS callerProcess = PsGetCurrentProcess();
+    const char* callerName = PsGetProcessImageFileName(callerProcess);
+    if (callerName && manager->m_processList->IsProcessWhitelistedByName(callerName)) {
         return OB_PREOP_SUCCESS;
     }
 

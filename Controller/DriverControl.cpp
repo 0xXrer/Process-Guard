@@ -211,6 +211,38 @@ bool DriverControl::AddWhitelist(DWORD pid) {
     return SendIoctl(IOCTL_PG_ADD_WHITELIST, &pidHandle, sizeof(pidHandle));
 }
 
+bool DriverControl::SetProtectionFlags(DWORD flags) {
+    return SendIoctl(IOCTL_PG_SET_FLAGS, &flags, sizeof(flags));
+}
+
+bool DriverControl::GetProtectionFlags(DWORD& flags) {
+    if (m_deviceHandle == INVALID_HANDLE_VALUE) {
+        SetLastError(L"Device not opened");
+        return false;
+    }
+
+    DWORD bytesReturned = 0;
+    BOOL result = DeviceIoControl(
+        m_deviceHandle,
+        IOCTL_PG_GET_FLAGS,
+        nullptr,
+        0,
+        &flags,
+        sizeof(flags),
+        &bytesReturned,
+        nullptr
+    );
+
+    if (!result) {
+        std::wstringstream ss;
+        ss << L"DeviceIoControl failed with error " << GetLastError();
+        SetLastError(ss.str());
+        return false;
+    }
+
+    return true;
+}
+
 bool DriverControl::SendIoctl(DWORD ioctlCode, void* inputBuffer, DWORD inputSize) {
     if (m_deviceHandle == INVALID_HANDLE_VALUE) {
         SetLastError(L"Device not opened");

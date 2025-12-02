@@ -24,6 +24,8 @@ public:
     bool DisableSelfDefense();
     bool AllowUnload();
     bool AddWhitelist(DWORD pid);
+    bool SetProtectionFlags(DWORD flags);
+    bool GetProtectionFlags(DWORD& flags);
 
     std::wstring GetLastErrorMessage() const;
 

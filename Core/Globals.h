@@ -19,6 +19,7 @@ namespace ProcessGuard {
 struct GlobalState {
     bool UnloadAllowed;
     bool SelfDefenseEnabled;
+    bool AutoProtectNewProcesses;
     HANDLE ControllerPid;
     unsigned int ProtectionFlags;
 };
